@@ -1,115 +1,81 @@
-import time
-import json
-import requests
-from playwright.sync_api import sync_playwright
+from __future__ import annotations
 
-# --- CONFIGURATION ---
-SEARCH_QUERY = "rtx 4070"
-MAX_PRICE = 2500
-TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-CHAT_ID = "YOUR_CHAT_ID"       # <--- Paste your ID here
-SEEN_ITEMS_FILE = "seen_items.json"
-CHECK_INTERVAL = 300 
+import argparse
+import asyncio
+import os
+from pathlib import Path
 
-def send_telegram(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {"chat_id": CHAT_ID, "text": message}
+from dotenv import load_dotenv
+
+from carouselly_core import (
+    CarousellyError,
+    SearchConfig,
+    build_search_url,
+    filter_new_listings,
+    load_seen_items,
+    save_seen_items,
+    scrape_carousell,
+)
+
+
+if hasattr(asyncio, "WindowsProactorEventLoopPolicy"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+
+load_dotenv()
+
+APP_ROOT = Path(__file__).resolve().parent
+SEEN_ITEMS_FILE = APP_ROOT / "seen_items.json"
+
+
+def env_int(name: str, default: int) -> int:
     try:
-        requests.post(url, data=data)
-    except Exception as e:
-        print(f"Failed to send alert: {e}")
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
 
-def load_seen_items():
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run a single Carouselly scan from the terminal.")
+    parser.add_argument("--product-name", default=os.getenv("SEARCH_QUERY", "vario 150"))
+    parser.add_argument("--min-price", type=int, default=env_int("MIN_PRICE", 2000))
+    parser.add_argument("--max-price", type=int, default=env_int("MAX_PRICE", 4000))
+    parser.add_argument("--max-results", type=int, default=env_int("MAX_RESULTS", 10))
+    parser.add_argument("--headless", action=argparse.BooleanOptionalAction, default=os.getenv("HEADLESS", "false").lower() in {"1", "true", "yes"})
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    config = SearchConfig(
+        product_name=args.product_name,
+        min_price=args.min_price,
+        max_price=args.max_price,
+        max_results=args.max_results,
+        headless=args.headless,
+    )
+
     try:
-        with open(SEEN_ITEMS_FILE, "r") as f:
-            return set(json.load(f))
-    except FileNotFoundError:
-        return set()
+        config.validate()
+        seen_ids = load_seen_items(SEEN_ITEMS_FILE)
+        listings = scrape_carousell(config)
+        new_items = filter_new_listings(listings, seen_ids)
 
-def save_seen_items(seen_ids):
-    with open(SEEN_ITEMS_FILE, "w") as f:
-        json.dump(list(seen_ids), f)
+        if new_items:
+            save_seen_items(SEEN_ITEMS_FILE, seen_ids)
 
-def check_carousell():
-    seen_ids = load_seen_items()
-    
-    with sync_playwright() as p:
-        # 1. Launch Visible Browser (headless=False)
-        # This helps bypass Cloudflare significantly better than headless
-        browser = p.chromium.launch(headless=False)
-        
-        # 2. Configure Context with a Real User Agent
-        # (This is the most important part of "Stealth")
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 720}
-        )
-        
-        page = context.new_page()
+        print(f"Scan URL: {build_search_url(config)}")
+        if new_items:
+            print(f"Found {len(new_items)} new listing(s):")
+            for listing in new_items:
+                print(f"- {listing.title} | {listing.price} | {listing.link}")
+        else:
+            print("No new listings found.")
+        return 0
+    except CarousellyError as exc:
+        print(f"Error: {exc}")
+        return 1
 
-        # 3. Manual Stealth Injection
-        # We inject JS to hide the "navigator.webdriver" flag that bots usually have
-        page.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-        """)
-
-        search_url = f"https://www.carousell.com.my/search/{SEARCH_QUERY}?sort_by=3&price_end={MAX_PRICE}"
-        
-        print(f"Checking: {search_url}")
-        
-        try:
-            page.goto(search_url, timeout=60000) # Increased timeout to 60s
-            
-            # Wait for listings. 
-            # If you see a Cloudflare "Verify you are human" box, 
-            # you can now manually click it because headless=False!
-            page.wait_for_selector('div[data-testid^="listing-card-"]', timeout=30000)
-        
-            listings = page.locator('div[data-testid^="listing-card-"]')
-            count = listings.count()
-            print(f"Found {count} listings.")
-            
-            new_items_found = False
-            
-            for i in range(min(count, 5)):
-                item = listings.nth(i)
-                item_id = item.get_attribute("data-testid").replace("listing-card-", "")
-                
-                if item_id not in seen_ids:
-                    # Try to get data, skip if it fails (ads/promos sometimes break structure)
-                    try:
-                        text_content = item.inner_text().split('\n')
-                        title = text_content[0]
-                        price = text_content[1]
-                        
-                        link_element = item.locator("a").first
-                        href = link_element.get_attribute("href")
-                        full_link = f"https://www.carousell.com.my{href}"
-
-                        msg = f"🚨 **New Deal Found!**\n\n**Item:** {title}\n**Price:** {price}\n**Link:** {full_link}"
-                        send_telegram(msg)
-                        print(f"Alert sent for {item_id}")
-                        
-                        seen_ids.add(item_id)
-                        new_items_found = True
-                    except Exception as e:
-                        print(f"Skipping item {item_id}: {e}")
-
-            if new_items_found:
-                save_seen_items(seen_ids)
-
-        except Exception as e:
-            print(f"Error during check: {e}")
-            # Optional: Take a screenshot to see what happened
-            # page.screenshot(path="error_screenshot.png")
-            
-        finally:
-            browser.close()
 
 if __name__ == "__main__":
-    while True:
-        check_carousell()
-        print(f"Sleeping for {CHECK_INTERVAL} seconds...")
-        time.sleep(CHECK_INTERVAL)
+    raise SystemExit(main())

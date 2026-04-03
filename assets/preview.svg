@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-label="Carouselly dashboard preview">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#f7f1e8"/>
+      <stop offset="100%" stop-color="#e7eef7"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#1f2a44"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#10213a" flood-opacity="0.16"/>
+    </filter>
+    <style>
+      .title { font: 700 38px Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .sub { font: 500 18px Segoe UI, Arial, sans-serif; fill: #475569; }
+      .label { font: 600 16px Segoe UI, Arial, sans-serif; fill: #cbd5e1; }
+      .metricLabel { font: 600 15px Segoe UI, Arial, sans-serif; fill: #64748b; }
+      .metricValue { font: 800 30px Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .panelText { font: 600 15px Segoe UI, Arial, sans-serif; fill: #e2e8f0; }
+      .cardText { font: 600 17px Segoe UI, Arial, sans-serif; fill: #0f172a; }
+      .cardSub { font: 500 14px Segoe UI, Arial, sans-serif; fill: #64748b; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="900" fill="url(#bg)"/>
+  <circle cx="1260" cy="110" r="120" fill="#ffd6a5" opacity="0.55"/>
+  <circle cx="180" cy="780" r="160" fill="#c7d2fe" opacity="0.35"/>
+
+  <text x="92" y="110" class="title">Carouselly</text>
+  <text x="92" y="146" class="sub">A polished Carousell monitor with focused filters, saved results, and clean alerts.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="86" y="205" rx="28" ry="28" width="324" height="610" fill="url(#panel)"/>
+    <text x="122" y="262" class="label">Search settings</text>
+    <rect x="122" y="292" rx="16" ry="16" width="252" height="56" fill="#334155"/>
+    <rect x="122" y="366" rx="16" ry="16" width="118" height="72" fill="#334155"/>
+    <rect x="256" y="366" rx="16" ry="16" width="118" height="72" fill="#334155"/>
+    <rect x="122" y="458" rx="16" ry="16" width="252" height="72" fill="#334155"/>
+    <rect x="122" y="550" rx="16" ry="16" width="252" height="64" fill="#f59e0b"/>
+    <text x="146" y="327" class="panelText">Product name</text>
+    <text x="146" y="408" class="panelText">Min price</text>
+    <text x="280" y="408" class="panelText">Max price</text>
+    <text x="146" y="501" class="panelText">Check interval</text>
+    <text x="168" y="591" class="label" fill="#111827">Start monitoring</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="450" y="205" rx="28" ry="28" width="864" height="610" fill="#ffffff"/>
+    <text x="492" y="262" class="title" font-size="28">Dashboard</text>
+    <text x="492" y="296" class="sub">Latest scan results update automatically and write directly to results.md.</text>
+
+    <g>
+      <rect x="492" y="330" rx="20" ry="20" width="238" height="124" fill="#f8fafc" stroke="#dbe4f0"/>
+      <text x="518" y="370" class="metricLabel">Found items</text>
+      <text x="518" y="414" class="metricValue">18</text>
+    </g>
+    <g>
+      <rect x="748" y="330" rx="20" ry="20" width="238" height="124" fill="#f8fafc" stroke="#dbe4f0"/>
+      <text x="774" y="370" class="metricLabel">Status</text>
+      <text x="774" y="414" class="metricValue">Active</text>
+    </g>
+    <g>
+      <rect x="1004" y="330" rx="20" ry="20" width="270" height="124" fill="#f8fafc" stroke="#dbe4f0"/>
+      <text x="1030" y="370" class="metricLabel">Last run</text>
+      <text x="1030" y="414" class="metricValue" font-size="24">12:42 PM</text>
+    </g>
+
+    <rect x="492" y="486" rx="22" ry="22" width="782" height="248" fill="#0f172a"/>
+    <text x="524" y="532" class="label">Latest findings</text>
+    <rect x="524" y="560" rx="16" ry="16" width="718" height="56" fill="#1e293b"/>
+    <rect x="524" y="630" rx="16" ry="16" width="718" height="56" fill="#1e293b"/>
+    <text x="556" y="594" class="panelText">MacBook Air M2</text>
+    <text x="1040" y="594" class="panelText">RM 3,250</text>
+    <text x="556" y="664" class="panelText">Dell Ultrasharp 27</text>
+    <text x="1040" y="664" class="panelText">RM 850</text>
+  </g>
+</svg>
