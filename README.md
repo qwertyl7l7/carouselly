@@ -49,9 +49,3 @@ Run the unit tests from the workspace root with:
 pytest carouselly/tests
 ```
 
-## Notes
-
-- Telegram integration was removed from the UI and code path.
-- Do not upload `.env`; it is local-only and already ignored by `.gitignore`. Share `.env.example` instead.
-- The dashboard can run headless or visibly, depending on the checkbox in the sidebar.
-- New listings are surfaced in the dashboard popups and latest-scan panel instead of a markdown export file.
