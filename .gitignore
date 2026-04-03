@@ -1,3 +1,21 @@
+# Environment variables (IMPORTANT: Contains sensitive credentials)
+.env
+
+# Virtual environment
 .venv/
+venv/
+env/
+
+# Python cache
 __pycache__/
+*.pyc
+
+# Database
 seen_items.json
+
+# Playwright
+.playwright/
+
+# IDE
+.vscode/
+.idea/

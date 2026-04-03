@@ -1,0 +1,4 @@
+playwright
+streamlit
+python-dotenv
+pytest
