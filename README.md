@@ -47,6 +47,7 @@ python main.py --product-name "iPhone 15" --min-price 2500 --max-price 4000
 2. Keep Linux runtime libraries in `packages.txt`.
 3. Use `HEADLESS=true` in your environment.
 4. On first run, if Chromium is missing, the app will auto-run `python -m playwright install chromium`.
+5. If anti-bot challenges persist, set `PROXY_SERVER` to a residential proxy endpoint.
 
 ## Testing
 

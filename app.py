@@ -51,6 +51,7 @@ def default_config() -> SearchConfig:
         max_results=env_int("MAX_RESULTS", 10),
         headless=default_headless(),
         check_interval=env_int("CHECK_INTERVAL", 300),
+        proxy_server=os.getenv("PROXY_SERVER") or None,
     )
 
 
@@ -247,6 +248,7 @@ def sidebar_controls() -> SearchConfig:
             max_results=int(max_results),
             headless=headless,
             check_interval=int(check_interval),
+            proxy_server=current.proxy_server,
         )
 
         st.session_state.current_config = config

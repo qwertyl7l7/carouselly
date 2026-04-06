@@ -42,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-price", type=int, default=env_int("MAX_PRICE", 4000))
     parser.add_argument("--max-results", type=int, default=env_int("MAX_RESULTS", 10))
     parser.add_argument("--headless", action=argparse.BooleanOptionalAction, default=os.getenv("HEADLESS", "false").lower() in {"1", "true", "yes"})
+    parser.add_argument("--proxy-server", default=os.getenv("PROXY_SERVER", ""))
     return parser.parse_args()
 
 
@@ -53,6 +54,7 @@ def main() -> int:
         max_price=args.max_price,
         max_results=args.max_results,
         headless=args.headless,
+        proxy_server=(args.proxy_server or None),
     )
 
     try:

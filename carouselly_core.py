@@ -73,6 +73,7 @@ class SearchConfig:
     max_results: int = 10
     headless: bool = False
     check_interval: int = 300
+    proxy_server: str | None = None
 
     def validate(self) -> None:
         if not self.product_name.strip():
@@ -217,19 +218,23 @@ def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> 
                 browser = None
                 context = None
                 try:
+                    launch_kwargs: dict[str, object] = {
+                        "headless": config.headless,
+                        "args": launch_args,
+                        "ignore_default_args": ["--enable-automation"],
+                    }
+                    if config.proxy_server:
+                        launch_kwargs["proxy"] = {"server": config.proxy_server}
+
                     try:
                         browser = playwright.chromium.launch(
-                            headless=config.headless,
-                            args=launch_args,
-                            ignore_default_args=["--enable-automation"],
+                            **launch_kwargs,
                         )
                     except Exception as exc:
                         if "Executable doesn't exist" in str(exc):
                             ensure_playwright_chromium_installed()
                             browser = playwright.chromium.launch(
-                                headless=config.headless,
-                                args=launch_args,
-                                ignore_default_args=["--enable-automation"],
+                                **launch_kwargs,
                             )
                         else:
                             raise
@@ -253,10 +258,6 @@ def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> 
                     page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
                     apply_human_like_behavior(page)
 
-                    page_text = page.content().lower()
-                    if "verify you are human" in page_text or "captcha" in page_text or "cloudflare" in page_text:
-                        raise ScrapeError("Bot protection challenge detected while loading Carousell.")
-
                     active_selector = None
                     for selector in selector_candidates:
                         try:
@@ -267,6 +268,12 @@ def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> 
                             continue
 
                     if not active_selector:
+                        page_text = page.content().lower()
+                        if "verify you are human" in page_text or "captcha" in page_text or "cloudflare" in page_text:
+                            raise ScrapeError(
+                                "Bot protection challenge detected while loading Carousell. "
+                                "Try a residential proxy via PROXY_SERVER or a remote browser endpoint."
+                            )
                         raise PlaywrightTimeoutError("No listing card selector matched.")
 
                     cards = page.locator(active_selector)
