@@ -41,6 +41,13 @@ Optional CLI scan:
 python main.py --product-name "iPhone 15" --min-price 2500 --max-price 4000
 ```
 
+## Streamlit Cloud Deploy
+
+1. Keep `playwright` in `requirements.txt`.
+2. Keep Linux runtime libraries in `packages.txt`.
+3. Use `HEADLESS=true` in your environment.
+4. On first run, if Chromium is missing, the app will auto-run `python -m playwright install chromium`.
+
 ## Testing
 
 Run the unit tests from the workspace root with:
@@ -54,4 +61,5 @@ pytest carouselly/tests
 - Telegram integration was removed from the UI and code path.
 - Do not upload `.env`; it is local-only and already ignored by `.gitignore`. Share `.env.example` instead.
 - The dashboard can run headless or visibly, depending on the checkbox in the sidebar.
+- On Linux and Streamlit Cloud, headless mode is enabled by default.
 - New listings are surfaced in the dashboard popups and latest-scan panel instead of a markdown export file.

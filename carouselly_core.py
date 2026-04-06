@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
+import os
 from pathlib import Path
+import subprocess
+import sys
 from typing import Iterable
 from urllib.parse import quote_plus
 import json
@@ -168,7 +171,14 @@ def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> 
 
     try:
         with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=config.headless)
+            try:
+                browser = playwright.chromium.launch(headless=config.headless)
+            except Exception as exc:
+                if "Executable doesn't exist" in str(exc):
+                    ensure_playwright_chromium_installed()
+                    browser = playwright.chromium.launch(headless=config.headless)
+                else:
+                    raise
             context = browser.new_context(
                 user_agent=DEFAULT_USER_AGENT,
                 viewport={"width": 1280, "height": 720},
@@ -216,6 +226,21 @@ def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> 
         ) from exc
     except Exception as exc:
         raise ScrapeError(f"Unexpected scraping failure: {exc}") from exc
+
+
+def ensure_playwright_chromium_installed() -> None:
+    install_cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
+    env = os.environ.copy()
+    env.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path.home() / ".cache" / "ms-playwright"))
+
+    result = subprocess.run(install_cmd, capture_output=True, text=True, env=env)
+    if result.returncode != 0:
+        error_output = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
+        raise ScrapeError(
+            "Playwright Chromium install failed during runtime. "
+            "On Streamlit Cloud, verify Linux libs in packages.txt and try redeploy. "
+            f"Installer output: {error_output[-1200:]}"
+        )
 
 
 def build_results_markdown(config: SearchConfig, listings: Iterable[Listing], source_url: str) -> str:

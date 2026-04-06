@@ -36,13 +36,20 @@ def env_int(name: str, default: int) -> int:
         return default
 
 
+def default_headless() -> bool:
+    value = os.getenv("HEADLESS")
+    if value is not None:
+        return value.lower() in {"1", "true", "yes"}
+    return os.name != "nt"
+
+
 def default_config() -> SearchConfig:
     return SearchConfig(
         product_name=os.getenv("SEARCH_QUERY", "vario 150"),
         min_price=env_int("MIN_PRICE", 2000),
         max_price=env_int("MAX_PRICE", 4000),
         max_results=env_int("MAX_RESULTS", 10),
-        headless=os.getenv("HEADLESS", "false").lower() in {"1", "true", "yes"},
+        headless=default_headless(),
         check_interval=env_int("CHECK_INTERVAL", 300),
     )
 
