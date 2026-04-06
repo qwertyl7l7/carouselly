@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 from pathlib import Path
+import random
 import subprocess
 import sys
 from typing import Iterable
@@ -18,6 +19,27 @@ DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
 )
+USER_AGENT_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+]
+STEALTH_INIT_SCRIPT = """
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+window.chrome = window.chrome || { runtime: {} };
+Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+Object.defineProperty(navigator, 'plugins', {
+    get: () => [1, 2, 3, 4, 5]
+});
+const originalQuery = navigator.permissions.query;
+navigator.permissions.query = (parameters) =>
+    parameters.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : originalQuery(parameters);
+"""
 
 
 def ensure_windows_event_loop_policy() -> None:
@@ -155,6 +177,14 @@ def parse_listing_card(raw_text: str, item_id: str, base_url: str = DEFAULT_BASE
     )
 
 
+def apply_human_like_behavior(page: object) -> None:
+    page.wait_for_timeout(random.randint(600, 1300))
+    page.mouse.move(random.randint(60, 320), random.randint(40, 180), steps=random.randint(8, 18))
+    page.mouse.wheel(0, random.randint(280, 620))
+    page.wait_for_timeout(random.randint(500, 1100))
+    page.mouse.wheel(0, -random.randint(120, 300))
+
+
 def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> list[Listing]:
     config.validate()
     ensure_windows_event_loop_policy()
@@ -168,55 +198,109 @@ def scrape_carousell(config: SearchConfig, base_url: str = DEFAULT_BASE_URL) -> 
         ) from exc
 
     search_url = build_search_url(config, base_url=base_url)
+    launch_args = [
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-features=IsolateOrigins,site-per-process",
+    ]
+    selector_candidates = [
+        'div[data-testid^="listing-card-"]',
+        'a[data-testid^="listing-card-"]',
+        '[data-testid*="listing-card"]',
+    ]
+    last_error: Exception | None = None
 
     try:
         with sync_playwright() as playwright:
-            try:
-                browser = playwright.chromium.launch(headless=config.headless)
-            except Exception as exc:
-                if "Executable doesn't exist" in str(exc):
-                    ensure_playwright_chromium_installed()
-                    browser = playwright.chromium.launch(headless=config.headless)
-                else:
-                    raise
-            context = browser.new_context(
-                user_agent=DEFAULT_USER_AGENT,
-                viewport={"width": 1280, "height": 720},
-            )
-            page = context.new_page()
-            page.add_init_script(
-                """
-                Object.defineProperty(navigator, 'webdriver', {
-                    get: () => undefined
-                });
-                """
-            )
-
-            try:
-                page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-                page.wait_for_selector('div[data-testid^="listing-card-"]', timeout=30000)
-
-                cards = page.locator('div[data-testid^="listing-card-"]')
-                total_cards = min(cards.count(), config.max_results)
-                listings: list[Listing] = []
-
-                for index in range(total_cards):
-                    card = cards.nth(index)
-                    item_id = (card.get_attribute("data-testid") or "").replace("listing-card-", "", 1)
-                    raw_text = card.inner_text()
+            for attempt in range(2):
+                browser = None
+                context = None
+                try:
                     try:
-                        listings.append(parse_listing_card(raw_text, item_id, base_url=base_url))
-                    except ScrapeError:
-                        continue
+                        browser = playwright.chromium.launch(
+                            headless=config.headless,
+                            args=launch_args,
+                            ignore_default_args=["--enable-automation"],
+                        )
+                    except Exception as exc:
+                        if "Executable doesn't exist" in str(exc):
+                            ensure_playwright_chromium_installed()
+                            browser = playwright.chromium.launch(
+                                headless=config.headless,
+                                args=launch_args,
+                                ignore_default_args=["--enable-automation"],
+                            )
+                        else:
+                            raise
 
-                return listings
-            except PlaywrightTimeoutError as exc:
-                raise ScrapeError(
-                    "Timed out waiting for Carousell listings. The site may be blocking automation."
-                ) from exc
-            finally:
-                context.close()
-                browser.close()
+                    context = browser.new_context(
+                        user_agent=random.choice(USER_AGENT_POOL) if config.headless else DEFAULT_USER_AGENT,
+                        viewport={"width": random.choice([1280, 1366, 1440]), "height": random.choice([720, 768, 900])},
+                        locale="en-US",
+                        timezone_id="Asia/Kuala_Lumpur",
+                    )
+                    context.set_extra_http_headers(
+                        {
+                            "Accept-Language": "en-US,en;q=0.9",
+                            "Upgrade-Insecure-Requests": "1",
+                            "DNT": "1",
+                        }
+                    )
+
+                    page = context.new_page()
+                    page.add_init_script(STEALTH_INIT_SCRIPT)
+                    page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
+                    apply_human_like_behavior(page)
+
+                    page_text = page.content().lower()
+                    if "verify you are human" in page_text or "captcha" in page_text or "cloudflare" in page_text:
+                        raise ScrapeError("Bot protection challenge detected while loading Carousell.")
+
+                    active_selector = None
+                    for selector in selector_candidates:
+                        try:
+                            page.wait_for_selector(selector, timeout=12000)
+                            active_selector = selector
+                            break
+                        except PlaywrightTimeoutError:
+                            continue
+
+                    if not active_selector:
+                        raise PlaywrightTimeoutError("No listing card selector matched.")
+
+                    cards = page.locator(active_selector)
+                    total_cards = min(cards.count(), config.max_results)
+                    listings: list[Listing] = []
+
+                    for index in range(total_cards):
+                        card = cards.nth(index)
+                        item_id = (card.get_attribute("data-testid") or "").replace("listing-card-", "", 1)
+                        raw_text = card.inner_text()
+                        try:
+                            listings.append(parse_listing_card(raw_text, item_id, base_url=base_url))
+                        except ScrapeError:
+                            continue
+
+                    if listings:
+                        return listings
+                    last_error = ScrapeError("No parseable listings were found in matched listing cards.")
+                except PlaywrightTimeoutError as exc:
+                    last_error = exc
+                except ScrapeError as exc:
+                    last_error = exc
+                finally:
+                    if context:
+                        context.close()
+                    if browser:
+                        browser.close()
+
+                if attempt == 0:
+                    continue
+
+            if isinstance(last_error, ScrapeError):
+                raise last_error
+            raise ScrapeError("Timed out waiting for Carousell listings. The site may be blocking automation.")
     except ScrapeError:
         raise
     except NotImplementedError as exc:
